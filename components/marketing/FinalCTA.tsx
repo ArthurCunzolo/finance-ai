@@ -12,7 +12,7 @@ export function FinalCTA() {
           Leva menos de dez minutos para cadastrar seu primeiro mês.
         </p>
         <div className="mt-8 flex justify-center">
-          <Button>Começar meu planejamento</Button>
+          <Button href="/wizard/passo-1-dados">Começar meu planejamento</Button>
         </div>
       </Reveal>
     </section>

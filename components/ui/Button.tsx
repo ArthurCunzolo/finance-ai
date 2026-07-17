@@ -1,10 +1,12 @@
 import type { ButtonHTMLAttributes } from "react";
+import Link from "next/link";
 import { cn } from "@/lib/utils/cn";
 
 type Variant = "primary" | "secondary" | "ghost";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
+  href?: string;
 }
 
 const VARIANT_STYLES: Record<Variant, string> = {
@@ -15,15 +17,20 @@ const VARIANT_STYLES: Record<Variant, string> = {
   ghost: "text-text-dim hover:text-text",
 };
 
-export function Button({ variant = "primary", className, ...props }: ButtonProps) {
-  return (
-    <button
-      className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-medium tracking-tight transition-all duration-200 ease-out active:scale-[0.97]",
-        VARIANT_STYLES[variant],
-        className,
-      )}
-      {...props}
-    />
+export function Button({ variant = "primary", className, href, ...props }: ButtonProps) {
+  const classes = cn(
+    "inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-medium tracking-tight transition-all duration-200 ease-out active:scale-[0.97]",
+    VARIANT_STYLES[variant],
+    className,
   );
+
+  if (href) {
+    return (
+      <Link href={href} className={classes}>
+        {props.children}
+      </Link>
+    );
+  }
+
+  return <button className={classes} {...props} />;
 }

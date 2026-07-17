@@ -75,8 +75,8 @@ export function Hero() {
             custom={0.24}
             className="mt-9 flex flex-wrap items-center gap-4"
           >
-            <Button>Começar meu planejamento</Button>
-            <Button variant="secondary">Ver como funciona</Button>
+            <Button href="/wizard/passo-1-dados">Começar meu planejamento</Button>
+            <Button variant="secondary" href="#como-funciona">Ver como funciona</Button>
           </motion.div>
 
           <motion.div
