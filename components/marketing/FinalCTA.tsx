@@ -9,7 +9,7 @@ export function FinalCTA() {
           Seu dinheiro já entra com destino. Comece a ver isso.
         </h2>
         <p className="mx-auto mt-4 max-w-md text-balance text-text-dim">
-          Grátis, sem login. Leva menos de dez minutos e o PDF cai no seu e-mail na hora.
+          Grátis, sem login. Leva menos de dez minutos e o PDF já baixa no final.
         </p>
         <div className="mt-8 flex justify-center">
           <Button href="/wizard/passo-1-dados">Começar meu planejamento</Button>

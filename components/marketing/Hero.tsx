@@ -88,7 +88,7 @@ export function Hero() {
           >
             <span>Sem cadastro</span>
             <span className="h-1 w-1 rounded-full bg-text-faint" />
-            <span>PDF na hora, direto no seu e-mail</span>
+            <span>PDF pronto na hora, direto no seu navegador</span>
           </motion.div>
         </div>
 

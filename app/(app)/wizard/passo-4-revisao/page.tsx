@@ -51,7 +51,6 @@ export default function ReviewStepPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [generatedPlanId, setGeneratedPlanId] = useState<string | null>(null);
-  const [emailSent, setEmailSent] = useState(false);
   const [isSaving, startSaving] = useTransition();
 
   useEffect(() => {
@@ -105,7 +104,6 @@ export default function ReviewStepPage() {
       if (response.planId) {
         setSaved(true);
         setGeneratedPlanId(response.planId);
-        setEmailSent(Boolean(response.emailSent));
         // Baixa o PDF automaticamente — sem login, sem passo extra.
         const link = document.createElement("a");
         link.href = `/api/pdf?planId=${response.planId}`;
@@ -252,9 +250,7 @@ export default function ReviewStepPage() {
           {saved && generatedPlanId ? (
             <div className="text-right">
               <p className="mb-2 text-[12px] text-mint-soft">
-                {emailSent
-                  ? `Também enviamos uma cópia para o seu e-mail.`
-                  : "Plano gerado. O download começou automaticamente."}
+                Plano gerado. O download do PDF começou automaticamente.
               </p>
               <div className="flex items-center gap-3">
                 <Button href={`/dashboard/${generatedPlanId}`} variant="secondary">
