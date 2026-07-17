@@ -5,10 +5,14 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { runEngine, type ExpenseInput, type IncomeInput, type TimelineEvent } from "@/lib/engine";
 import { wizardDataSchema, type WizardData } from "@/lib/validators/wizard";
+import { getPlanById } from "@/lib/data/plan";
+import { sendPlanEmail } from "@/lib/email/sendPlanEmail";
 
 export interface SavePlanResult {
   planId?: string;
   error?: string;
+  emailSent?: boolean;
+  emailSkippedReason?: string;
 }
 
 /** Serializa a timeline (com objetos Date) para um formato aceito pelo campo Json do Prisma. */
@@ -164,5 +168,22 @@ export async function submitPlan(rawData: WizardData): Promise<SavePlanResult> {
 
   revalidatePath("/dashboard");
 
-  return { planId };
+  // 5. Envia o PDF por e-mail automaticamente — não bloqueia nem falha o
+  // fluxo principal se o e-mail não puder ser enviado (ver sendPlanEmail).
+  const fullPlan = await getPlanById(planId);
+  let emailSent = false;
+  let emailSkippedReason: string | undefined;
+
+  if (fullPlan) {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    const emailResult = await sendPlanEmail({
+      toEmail: data.personal.email,
+      plan: fullPlan,
+      appUrl,
+    });
+    emailSent = emailResult.sent;
+    emailSkippedReason = emailResult.skippedReason ?? emailResult.error;
+  }
+
+  return { planId, emailSent, emailSkippedReason };
 }

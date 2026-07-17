@@ -71,9 +71,17 @@ git push origin feature/nome-da-feature
 A pedido explícito: **este não é um produto de venda com paywall — é uma ferramenta de captação livre.** Qualquer pessoa preenche o wizard, sem criar conta, e recebe:
 
 - O **plano calculado na hora** (dashboard em `/dashboard/[planId]`, um link direto — sem exigir login para visualizar)
-- O **PDF gerado e baixado automaticamente** ao confirmar o último passo do wizard
+- O **PDF baixado automaticamente** no navegador ao confirmar o último passo do wizard
+- **O mesmo PDF enviado automaticamente por e-mail** (via Resend), sem nenhum clique extra — assim que o plano é salvo, o e-mail sai com o PDF anexado e um link para o dashboard
 
 O único dado coletado é o **e-mail do passo 1**, que identifica o "lead" no banco (tabela `User`) — é assim que sabemos quem preencheu o quê, sem fricção de senha/cadastro.
+
+**Se `RESEND_API_KEY` não estiver configurada**, o envio de e-mail é pulado silenciosamente (sem quebrar o fluxo) — o download direto no navegador continua funcionando normalmente. Configure a chave para habilitar o envio automático:
+
+| Nome | Onde conseguir |
+|---|---|
+| `RESEND_API_KEY` | resend.com → API Keys |
+| `RESEND_FROM_EMAIL` | um remetente verificado no seu domínio Resend (ex: `Finance AI <plano@seudominio.com>`). Sem domínio verificado, use o padrão de testes `onboarding@resend.dev` (só entrega para o e-mail cadastrado na sua conta Resend) |
 
 **Trade-off importante e deliberado**: como o link do dashboard não exige login, ele funciona como um "link mágico" — qualquer pessoa com a URL consegue ver aquele plano específico. Os IDs são gerados de forma não sequencial (cuid), então não são adivinháveis, mas não há uma segunda camada de autenticação sobre o link. Isso é aceitável para a fase atual (captação/validação), mas deve ser revisto antes de tratar dados financeiros mais sensíveis em escala — nesse momento, login + Supabase Auth (já implementado nas páginas `/login` e `/cadastro`, hoje não usadas no fluxo principal) pode virar obrigatório para visualizar o dashboard.
 
@@ -81,9 +89,9 @@ Login e cadastro (`/login`, `/cadastro`) **já existem no código** mas não sã
 
 ## 8. O que ainda não existe
 
-- Envio automático do PDF por e-mail (hoje o download é direto no navegador — enviar por e-mail depende de configurar Resend)
 - Histórico de múltiplos planejamentos por pessoa (cada envio do wizard sobrescreve o plano do mês corrente daquele e-mail)
 - Login obrigatório / conta de verdade vinculada ao lead
+- Reenvio manual do e-mail pelo dashboard (hoje só reenvia se a pessoa refizer o wizard)
 
 ## Troubleshooting rápido
 

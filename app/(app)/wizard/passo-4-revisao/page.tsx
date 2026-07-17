@@ -51,6 +51,7 @@ export default function ReviewStepPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [generatedPlanId, setGeneratedPlanId] = useState<string | null>(null);
+  const [emailSent, setEmailSent] = useState(false);
   const [isSaving, startSaving] = useTransition();
 
   useEffect(() => {
@@ -104,6 +105,7 @@ export default function ReviewStepPage() {
       if (response.planId) {
         setSaved(true);
         setGeneratedPlanId(response.planId);
+        setEmailSent(Boolean(response.emailSent));
         // Baixa o PDF automaticamente — sem login, sem passo extra.
         const link = document.createElement("a");
         link.href = `/api/pdf?planId=${response.planId}`;
@@ -248,17 +250,24 @@ export default function ReviewStepPage() {
         <div className="text-right">
           {saveError && <p className="mb-2 text-[12px] text-danger">{saveError}</p>}
           {saved && generatedPlanId ? (
-            <div className="flex items-center gap-3">
-              <Button href={`/dashboard/${generatedPlanId}`} variant="secondary">
-                Ver dashboard
-              </Button>
-              <a
-                href={`/api/pdf?planId=${generatedPlanId}`}
-                download
-                className="inline-flex items-center justify-center rounded-full bg-mint px-6 py-3 text-sm font-medium text-ink transition-all hover:bg-mint-soft"
-              >
-                Baixar PDF de novo
-              </a>
+            <div className="text-right">
+              <p className="mb-2 text-[12px] text-mint-soft">
+                {emailSent
+                  ? `Também enviamos uma cópia para o seu e-mail.`
+                  : "Plano gerado. O download começou automaticamente."}
+              </p>
+              <div className="flex items-center gap-3">
+                <Button href={`/dashboard/${generatedPlanId}`} variant="secondary">
+                  Ver dashboard
+                </Button>
+                <a
+                  href={`/api/pdf?planId=${generatedPlanId}`}
+                  download
+                  className="inline-flex items-center justify-center rounded-full bg-mint px-6 py-3 text-sm font-medium text-ink transition-all hover:bg-mint-soft"
+                >
+                  Baixar PDF de novo
+                </a>
+              </div>
             </div>
           ) : (
             <Button onClick={handleSubmit(handleConfirmPlan)} disabled={isSaving}>
