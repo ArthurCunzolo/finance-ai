@@ -1,0 +1,391 @@
+// Finance AI — Schema de banco de dados
+// Postgres via Supabase, ORM Prisma.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// IDENTIDADE / HOUSEHOLD
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  avatarUrl     String?
+  maritalStatus MaritalStatus?
+  financialGoal FinancialGoal?
+  financialGoalNote String?
+  householdId   String?
+  household     Household? @relation(fields: [householdId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  plans                     FinancialPlan[]
+  recurringIncomeTemplates  RecurringIncomeTemplate[]
+  recurringExpenseTemplates RecurringExpenseTemplate[]
+  creditCards               CreditCard[]
+  emergencyFund             EmergencyFund?
+  debts                     Debt[]
+  notifications             Notification[]
+}
+
+model Household {
+  id          String @id @default(cuid())
+  name        String
+  peopleCount Int    @default(1)
+  members     User[]
+  createdAt   DateTime @default(now())
+}
+
+enum MaritalStatus {
+  SOLTEIRO
+  CASADO
+  UNIAO_ESTAVEL
+  DIVORCIADO
+  VIUVO
+}
+
+enum FinancialGoal {
+  QUITAR_DIVIDAS
+  JUNTAR_RESERVA
+  COMPRAR_IMOVEL
+  COMPRAR_VEICULO
+  APOSENTADORIA
+  ORGANIZAR_FINANCAS
+  OUTRO
+}
+
+// ---------------------------------------------------------------------------
+// PLANEJAMENTO FINANCEIRO (snapshot mensal)
+// ---------------------------------------------------------------------------
+
+model FinancialPlan {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String
+  referenceMonth DateTime // primeiro dia do mês de referência
+
+  incomes      Income[]
+  expenses     Expense[]
+  insights     Insight[]
+  distribution DistributionResult?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  updatedBy String? // id do membro do household que fez a última edição
+
+  @@unique([userId, referenceMonth])
+  @@index([userId])
+}
+
+model Income {
+  id         String     @id @default(cuid())
+  planId     String
+  plan       FinancialPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  templateId String?    // se veio de um RecurringIncomeTemplate
+  name       String
+  amount     Decimal    @db.Decimal(12, 2)
+  receiveDay Int        // 1-31
+  recurrence Recurrence
+  category   IncomeCategory
+  notes      String?
+
+  @@index([planId])
+}
+
+model Expense {
+  id                String     @id @default(cuid())
+  planId            String
+  plan              FinancialPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  templateId        String?    // se veio de um RecurringExpenseTemplate
+  name              String
+  amount            Decimal    @db.Decimal(12, 2)
+  dueDay            Int
+  recurrence        Recurrence
+  category          ExpenseCategory
+  priority          Priority
+  paymentMethod     PaymentMethod
+  isInstallment     Boolean    @default(false)
+  installmentsTotal Int?
+  installmentsPaid  Int?
+  isVariable        Boolean    @default(false)
+
+  @@index([planId])
+}
+
+enum Recurrence {
+  MENSAL
+  QUINZENAL
+  SEMANAL
+  ANUAL
+  PERSONALIZADO
+  UNICA
+}
+
+enum IncomeCategory {
+  SALARIO
+  SALARIO_COMPANHEIRO
+  VALE_ALIMENTACAO
+  VALE_REFEICAO
+  COMISSAO
+  FREELANCER
+  PIX_RECEBIDO
+  RENDA_EXTRA
+  ALUGUEL_RECEBIDO
+  DIVIDENDOS
+  ANTECIPACAO_SALARIAL
+  BENEFICIOS
+  DECIMO_TERCEIRO
+  PLR
+  OUTROS
+}
+
+enum ExpenseCategory {
+  MORADIA
+  ALUGUEL
+  FINANCIAMENTO
+  AGUA
+  LUZ
+  INTERNET
+  TELEFONE
+  MERCADO
+  COMBUSTIVEL
+  TRANSPORTE
+  EDUCACAO
+  SAUDE
+  STREAMING
+  INVESTIMENTOS
+  LAZER
+  PETS
+  FILHOS
+  CARTAO_CREDITO
+  OUTROS
+}
+
+enum Priority {
+  URGENTE
+  MUITO_ALTA
+  ESSENCIAL
+  ALTA
+  MEDIA
+  BAIXA
+  OPCIONAL
+  MUITO_BAIXA
+}
+
+enum PaymentMethod {
+  CARTAO
+  PIX
+  DEBITO
+  BOLETO
+  DINHEIRO
+}
+
+// ---------------------------------------------------------------------------
+// TEMPLATES RECORRENTES (regra) — geram Income/Expense (instância) por mês
+// ---------------------------------------------------------------------------
+
+model RecurringIncomeTemplate {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  amount     Decimal  @db.Decimal(12, 2)
+  receiveDay Int
+  recurrence Recurrence
+  category   IncomeCategory
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+
+model RecurringExpenseTemplate {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  amount        Decimal  @db.Decimal(12, 2)
+  dueDay        Int
+  recurrence    Recurrence
+  category      ExpenseCategory
+  priority      Priority
+  paymentMethod PaymentMethod
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// CARTÃO DE CRÉDITO
+// ---------------------------------------------------------------------------
+
+model CreditCard {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nickname   String
+  lastDigits String   @db.VarChar(4)
+  closingDay Int
+  dueDay     Int
+  limit      Decimal? @db.Decimal(12, 2)
+  active     Boolean  @default(true)
+
+  purchases CardPurchase[]
+  invoices  CardInvoice[]
+
+  @@index([userId])
+}
+
+model CardPurchase {
+  id                String     @id @default(cuid())
+  creditCardId      String
+  creditCard        CreditCard @relation(fields: [creditCardId], references: [id], onDelete: Cascade)
+  description       String
+  amount            Decimal    @db.Decimal(12, 2)
+  purchaseDate      DateTime
+  installmentsTotal Int        @default(1)
+  installmentIndex  Int        @default(1)
+  category          ExpenseCategory
+
+  @@index([creditCardId])
+}
+
+model CardInvoice {
+  id             String        @id @default(cuid())
+  creditCardId   String
+  creditCard     CreditCard    @relation(fields: [creditCardId], references: [id], onDelete: Cascade)
+  referenceMonth DateTime
+  totalAmount    Decimal       @db.Decimal(12, 2)
+  status         InvoiceStatus @default(ABERTA)
+
+  @@unique([creditCardId, referenceMonth])
+  @@index([creditCardId])
+}
+
+enum InvoiceStatus {
+  ABERTA
+  FECHADA
+  PAGA
+}
+
+// ---------------------------------------------------------------------------
+// RESERVA DE EMERGÊNCIA (acumulada ao longo do tempo, por usuário)
+// ---------------------------------------------------------------------------
+
+model EmergencyFund {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetMonths Int      @default(6)
+
+  contributions EmergencyFundContribution[]
+}
+
+model EmergencyFundContribution {
+  id              String        @id @default(cuid())
+  emergencyFundId String
+  emergencyFund   EmergencyFund @relation(fields: [emergencyFundId], references: [id], onDelete: Cascade)
+  amount          Decimal       @db.Decimal(12, 2) // positivo = aporte, negativo = saque
+  date            DateTime      @default(now())
+  note            String?
+
+  @@index([emergencyFundId])
+}
+
+// ---------------------------------------------------------------------------
+// DÍVIDAS (estratégia snowball/avalanche)
+// ---------------------------------------------------------------------------
+
+model Debt {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  totalAmount     Decimal  @db.Decimal(12, 2)
+  remainingAmount Decimal  @db.Decimal(12, 2)
+  interestRateMonthly Decimal @db.Decimal(6, 4) // ex: 0.0299 = 2.99% a.m.
+  minPayment      Decimal  @db.Decimal(12, 2)
+  dueDay          Int
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// RESULTADO DO MOTOR / INSIGHTS
+// ---------------------------------------------------------------------------
+
+model DistributionResult {
+  id           String   @id @default(cuid())
+  planId       String   @unique
+  plan         FinancialPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  timeline     Json     // TimelineEvent[] serializado — ver lib/engine/types.ts
+  totalIncome  Decimal  @db.Decimal(12, 2)
+  totalExpense Decimal  @db.Decimal(12, 2)
+  balance      Decimal  @db.Decimal(12, 2)
+  committedPct Decimal  @db.Decimal(6, 4)
+  healthScore  Int      // 0-100
+  generatedAt  DateTime @default(now())
+}
+
+model Insight {
+  id        String          @id @default(cuid())
+  planId    String
+  plan      FinancialPlan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  type      InsightType
+  message   String
+  severity  InsightSeverity @default(INFO)
+  createdAt DateTime        @default(now())
+
+  @@index([planId])
+}
+
+enum InsightType {
+  GASTO_CATEGORIA_ALTO
+  RESERVA_BAIXA
+  SUGESTAO_ECONOMIA
+  SOBRA_PROJETADA
+  ALERTA_DEFICIT
+  OUTRO
+}
+
+enum InsightSeverity {
+  INFO
+  ATENCAO
+  CRITICO
+}
+
+// ---------------------------------------------------------------------------
+// NOTIFICAÇÕES / LEMBRETES
+// ---------------------------------------------------------------------------
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  scheduledFor DateTime
+  sentAt    DateTime?
+  channel   NotificationChannel @default(APP)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+enum NotificationChannel {
+  APP
+  EMAIL
+  WHATSAPP
+}
