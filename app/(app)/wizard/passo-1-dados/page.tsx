@@ -28,6 +28,7 @@ export default function PersonalStepPage() {
     resolver: zodResolver(personalSchema),
     defaultValues: state.personal ?? {
       name: "",
+      email: "",
       maritalStatus: "SOLTEIRO",
       peopleCount: 1,
       financialGoal: "ORGANIZAR_FINANCAS",
@@ -50,6 +51,10 @@ export default function PersonalStepPage() {
       <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-5">
         <Field label="Como podemos te chamar?" htmlFor="name" error={errors.name?.message}>
           <TextInput id="name" placeholder="Seu nome" {...register("name")} />
+        </Field>
+
+        <Field label="Seu e-mail" htmlFor="email" error={errors.email?.message} hint="É para onde enviamos o link do seu plano em PDF.">
+          <TextInput id="email" type="email" placeholder="voce@email.com" {...register("email")} />
         </Field>
 
         <div className="grid grid-cols-2 gap-4">

@@ -86,9 +86,9 @@ export function Hero() {
             custom={0.32}
             className="mt-10 flex items-center gap-6 text-xs text-text-faint"
           >
-            <span>Sem cartão de crédito</span>
+            <span>Sem cadastro</span>
             <span className="h-1 w-1 rounded-full bg-text-faint" />
-            <span>Dados nunca compartilhados</span>
+            <span>PDF na hora, direto no seu e-mail</span>
           </motion.div>
         </div>
 

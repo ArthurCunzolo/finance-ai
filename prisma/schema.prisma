@@ -17,6 +17,7 @@ datasource db {
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
+  authUserId    String?   @unique // preenchido só se/quando o lead criar uma conta de verdade (Supabase Auth)
   name          String
   avatarUrl     String?
   maritalStatus MaritalStatus?

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,6 +12,7 @@ import { PriorityBadge } from "@/components/ui/PriorityBadge";
 import { runEngine, type DistributionResult, type ExpenseInput, type IncomeInput } from "@/lib/engine";
 import { emergencyFundStepSchema, type EmergencyFundStepData } from "@/lib/validators/wizard";
 import { useWizard } from "@/lib/wizard/WizardContext";
+import { submitPlan } from "@/lib/actions/plan";
 
 function formatBRL(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -47,7 +48,10 @@ function statusColor(status: string): string {
 export default function ReviewStepPage() {
   const router = useRouter();
   const { state, setEmergencyFund } = useWizard();
-  const [confirmed, setConfirmed] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [generatedPlanId, setGeneratedPlanId] = useState<string | null>(null);
+  const [isSaving, startSaving] = useTransition();
 
   useEffect(() => {
     if (!state.personal) router.replace("/wizard/passo-1-dados");
@@ -74,9 +78,41 @@ export default function ReviewStepPage() {
     });
   }, [state.personal, state.incomes, state.expenses, liveEmergencyFund]);
 
-  function onSubmitEmergencyFund(data: EmergencyFundStepData) {
+  function onUpdateEmergencyFund(data: EmergencyFundStepData) {
     setEmergencyFund(data);
-    setConfirmed(true);
+  }
+
+  function handleConfirmPlan(data: EmergencyFundStepData) {
+    setEmergencyFund(data);
+    setSaveError(null);
+
+    if (!state.personal) return;
+
+    startSaving(async () => {
+      const response = await submitPlan({
+        personal: state.personal!,
+        incomes: state.incomes,
+        expenses: state.expenses,
+        emergencyFund: data,
+      });
+
+      if (response.error) {
+        setSaveError(response.error);
+        return;
+      }
+
+      if (response.planId) {
+        setSaved(true);
+        setGeneratedPlanId(response.planId);
+        // Baixa o PDF automaticamente — sem login, sem passo extra.
+        const link = document.createElement("a");
+        link.href = `/api/pdf?planId=${response.planId}`;
+        link.download = "";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    });
   }
 
   if (!result) return null;
@@ -109,7 +145,7 @@ export default function ReviewStepPage() {
 
       <GlassCard className="p-7">
         <h2 className="font-display text-lg font-medium tracking-tight">Reserva de emergência</h2>
-        <form onSubmit={handleSubmit(onSubmitEmergencyFund)} className="mt-4 grid gap-4 sm:grid-cols-2">
+        <form onSubmit={handleSubmit(onUpdateEmergencyFund)} className="mt-4 grid gap-4 sm:grid-cols-2">
           <Field label="Meses de cobertura desejados" htmlFor="targetMonths">
             <Controller
               control={control}
@@ -205,17 +241,31 @@ export default function ReviewStepPage() {
         </div>
       </GlassCard>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <Button variant="ghost" onClick={() => router.push("/wizard/passo-3-saidas")}>
           Voltar
         </Button>
-        {confirmed ? (
-          <p className="max-w-xs text-right text-[12px] text-mint-soft">
-            Plano calculado. A geração de PDF e o salvamento na sua conta chegam na próxima fase, com login conectado.
-          </p>
-        ) : (
-          <Button onClick={handleSubmit(onSubmitEmergencyFund)}>Confirmar plano do mês</Button>
-        )}
+        <div className="text-right">
+          {saveError && <p className="mb-2 text-[12px] text-danger">{saveError}</p>}
+          {saved && generatedPlanId ? (
+            <div className="flex items-center gap-3">
+              <Button href={`/dashboard/${generatedPlanId}`} variant="secondary">
+                Ver dashboard
+              </Button>
+              <a
+                href={`/api/pdf?planId=${generatedPlanId}`}
+                download
+                className="inline-flex items-center justify-center rounded-full bg-mint px-6 py-3 text-sm font-medium text-ink transition-all hover:bg-mint-soft"
+              >
+                Baixar PDF de novo
+              </a>
+            </div>
+          ) : (
+            <Button onClick={handleSubmit(handleConfirmPlan)} disabled={isSaving}>
+              {isSaving ? "Gerando seu plano…" : "Gerar meu plano em PDF"}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

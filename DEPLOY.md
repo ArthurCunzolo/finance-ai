@@ -21,22 +21,23 @@ Na tela de importação, a Vercel detecta Next.js automaticamente. Confirme:
 
 ## 3. Variáveis de ambiente
 
-Antes de clicar em Deploy, abra **Environment Variables** e adicione as chaves de `.env.example`. Neste estágio do projeto (Fase 1–4: fundação, motor, landing, wizard), a aplicação **roda sem nenhuma variável configurada** — Prisma/Supabase ainda não estão conectados a nenhuma rota. Você pode:
+Abra **Environment Variables** e adicione as chaves de `.env.example` **antes do primeiro deploy** — a partir desta fase, o wizard já salva de verdade no banco (via Prisma) e gera o PDF sob demanda, então `DATABASE_URL` é obrigatório para o fluxo principal funcionar.
 
-- **Fazer o primeiro deploy sem nenhuma env var** (mais rápido, útil só para validar landing + wizard).
-- **Ou já configurar agora**, para não precisar redeployar quando a Fase 5+ (persistência real) chegar:
-
-| Nome | Onde conseguir |
-|---|---|
-| `DATABASE_URL` | Supabase → Project Settings → Database → Connection string (modo "Transaction") |
-| `DIRECT_URL` | Supabase → Project Settings → Database → Connection string (modo "Session") |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Project Settings → API |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → Project Settings → API |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API (chave secreta — nunca exponha no client) |
-| `RESEND_API_KEY` | resend.com → API Keys (só necessário a partir da Fase 6) |
-| `NEXT_PUBLIC_APP_URL` | a própria URL que a Vercel vai gerar (ex: `https://finance-ai.vercel.app`) — pode editar depois do 1º deploy |
+| Nome | Onde conseguir | Obrigatório agora? |
+|---|---|---|
+| `DATABASE_URL` | Supabase → Project Settings → Database → Connection string (modo "Transaction") | **Sim** |
+| `DIRECT_URL` | Supabase → Project Settings → Database → Connection string (modo "Session") | **Sim** (usado pelo `prisma migrate`) |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Project Settings → API | Sim (login/cadastro opcional já está no código, mesmo não sendo exigido no fluxo principal) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → Project Settings → API | Sim |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API (chave secreta — nunca exponha no client) | Recomendado |
+| `NEXT_PUBLIC_APP_URL` | a própria URL que a Vercel vai gerar (ex: `https://finance-ai.vercel.app`) | Recomendado |
 
 Marque cada variável para os três ambientes (**Production**, **Preview**, **Development**), a menos que tenha motivo para separar.
+
+**Antes do primeiro deploy**, rode a migração do schema contra o banco do Supabase (uma vez, do seu computador):
+```bash
+npm run db:push
+```
 
 ## 4. Deploy
 
@@ -65,20 +66,24 @@ git push origin feature/nome-da-feature
 # depois de revisar, faz merge na main -> deploy de produção automático
 ```
 
-## 7. O que já funciona no deploy atual
+## 7. Como o produto funciona agora (decisão de produto)
 
-- **Landing page** (`/`): hero 3D, funcionalidades, como funciona, seção do fundador, CTA final
-- **Wizard** (`/wizard/passo-1-dados` em diante): 4 passos completos, com autosave em `localStorage` do navegador (não depende de banco de dados ainda)
-- **Motor financeiro**: roda 100% no navegador na revisão do wizard, mostrando resultado completo (timeline, insights, health score, reserva de emergência)
+A pedido explícito: **este não é um produto de venda com paywall — é uma ferramenta de captação livre.** Qualquer pessoa preenche o wizard, sem criar conta, e recebe:
 
-## 8. O que ainda não persiste (chega nas próximas fases)
+- O **plano calculado na hora** (dashboard em `/dashboard/[planId]`, um link direto — sem exigir login para visualizar)
+- O **PDF gerado e baixado automaticamente** ao confirmar o último passo do wizard
 
-- Login/autenticação (Supabase Auth)
-- Salvar o plano no banco (hoje fica só no `localStorage` do navegador que gerou)
-- Geração de PDF e envio por e-mail
-- Dashboard com histórico de múltiplos meses
+O único dado coletado é o **e-mail do passo 1**, que identifica o "lead" no banco (tabela `User`) — é assim que sabemos quem preencheu o quê, sem fricção de senha/cadastro.
 
-Ou seja: o deploy já é **navegável e funcional de ponta a ponta para um usuário testar o cálculo**, mas ainda não guarda dados entre dispositivos/sessões diferentes até a Fase 5 (Dashboard + persistência) ser implementada.
+**Trade-off importante e deliberado**: como o link do dashboard não exige login, ele funciona como um "link mágico" — qualquer pessoa com a URL consegue ver aquele plano específico. Os IDs são gerados de forma não sequencial (cuid), então não são adivinháveis, mas não há uma segunda camada de autenticação sobre o link. Isso é aceitável para a fase atual (captação/validação), mas deve ser revisto antes de tratar dados financeiros mais sensíveis em escala — nesse momento, login + Supabase Auth (já implementado nas páginas `/login` e `/cadastro`, hoje não usadas no fluxo principal) pode virar obrigatório para visualizar o dashboard.
+
+Login e cadastro (`/login`, `/cadastro`) **já existem no código** mas não são exigidos em nenhum ponto do fluxo principal — ficam prontos para quando fizer sentido oferecer "criar conta para salvar histórico de vários meses" como upgrade opcional.
+
+## 8. O que ainda não existe
+
+- Envio automático do PDF por e-mail (hoje o download é direto no navegador — enviar por e-mail depende de configurar Resend)
+- Histórico de múltiplos planejamentos por pessoa (cada envio do wizard sobrescreve o plano do mês corrente daquele e-mail)
+- Login obrigatório / conta de verdade vinculada ao lead
 
 ## Troubleshooting rápido
 
