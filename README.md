@@ -1,24 +1,34 @@
 # Finance AI
 
-Plataforma inteligente de planejamento financeiro pessoal/familiar. Coleta entradas e saídas, distribui automaticamente as contas por prioridade e data, calcula reserva de emergência, gera insights e um relatório em PDF premium.
+Versão de teste/demonstração: o usuário preenche entradas e saídas, vê o plano calculado na
+hora (dashboard com gráficos, insights e reserva de emergência) e baixa um PDF do plano —
+tudo sem login, sem conta e **sem banco de dados**.
 
 ## Status
 
-🚧 Fase 1 + 2 do roadmap: **Fundação** e **Motor Financeiro** (`lib/engine`) implementados. UI (landing, wizard, dashboard) ainda não iniciada — ver `PLANO.md`.
+Landing page, wizard completo (4 passos) e geração de PDF funcionando de ponta a ponta.
+Ver `PLANO.md` para o roadmap completo original (algumas fases, como persistência e login,
+foram deliberadamente removidas desta versão — ver `DEPLOY.md`, seção "Como o produto
+funciona").
 
 ## Stack
 
 - Next.js 16 (App Router) + TypeScript estrito
-- TailwindCSS + Framer Motion + GSAP + Three.js / React Three Fiber
-- Prisma + Supabase (Postgres, Auth, Storage)
+- TailwindCSS + Framer Motion + Three.js (cenas 3D em vanilla, sem R3F)
 - React Hook Form + Zod
 - Recharts
 - `@react-pdf/renderer`
 - Vitest (testes do motor financeiro)
 
+Sem Prisma, sem Supabase, sem nenhum serviço externo — zero variáveis de ambiente
+necessárias para rodar (ver `DEPLOY.md`).
+
 ## Motor Financeiro (`lib/engine`)
 
-Núcleo puro e determinístico, sem dependência de React/Next/DB — recebe entradas/saídas normalizadas e devolve a distribuição completa do mês.
+Núcleo puro e determinístico, sem dependência de React/Next — recebe entradas/saídas
+normalizadas e devolve a distribuição completa do mês. Roda tanto no navegador (preview em
+tempo real no passo 4 do wizard) quanto no servidor (rota `/api/pdf`, que recalcula tudo
+antes de gerar o documento oficial).
 
 ```
 lib/engine/
@@ -42,16 +52,14 @@ npm run test
 
 ```bash
 npm install
-cp .env.example .env       # preencher com credenciais do Supabase
-npm run db:generate
-npm run db:push            # aplica o schema no banco (dev)
 npm run dev
 ```
 
-## Banco de dados
-
-Schema completo em `prisma/schema.prisma`, cobrindo: usuários/household, planejamentos mensais, templates de recorrência, cartão de crédito (fatura/fechamento), reserva de emergência (histórico de aportes), dívidas, insights e notificações.
+Não precisa de `.env` — não há nada para configurar.
 
 ## Documentação de planejamento
 
-Ver `PLANO.md` para a análise crítica do PRD original, arquitetura completa, algoritmo de distribuição financeira detalhado e roadmap de fases.
+Ver `PLANO.md` para a análise crítica do PRD original e a arquitetura completa pensada para
+uma versão de produto real (com banco de dados, login e as demais fases do roadmap). O
+código atual implementa deliberadamente só o subconjunto necessário para o teste sem
+fricção: wizard + cálculo + PDF.

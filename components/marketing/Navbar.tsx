@@ -31,8 +31,8 @@ export function Navbar() {
             </a>
           ))}
         </div>
-        <Button variant="secondary" href="/login" className="!px-4 !py-2 text-[13px]">
-          Entrar
+        <Button href="/wizard/passo-1-dados" className="!px-4 !py-2 text-[13px]">
+          Começar
         </Button>
       </nav>
     </motion.header>

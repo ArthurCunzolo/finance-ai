@@ -11,7 +11,6 @@ import {
 
 export const personalSchema = z.object({
   name: z.string().trim().min(2, "Informe seu nome."),
-  email: z.string().trim().toLowerCase().email("Informe um e-mail válido."),
   maritalStatus: z.enum(MARITAL_STATUS),
   peopleCount: z.number().int().min(1, "Mínimo 1 pessoa.").max(20),
   financialGoal: z.enum(FINANCIAL_GOAL),

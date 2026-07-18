@@ -1,5 +1,5 @@
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
-import type { DashboardPlan } from "@/lib/data/plan";
+import type { ComputedPlan } from "@/lib/types/plan";
 
 function formatBRL(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -93,7 +93,7 @@ function statusLabel(status: string): string {
   }
 }
 
-export function PlanReport({ plan }: { plan: DashboardPlan }) {
+export function PlanReport({ plan }: { plan: ComputedPlan }) {
   const monthLabel = new Date(plan.referenceMonth).toLocaleDateString("pt-BR", {
     month: "long",
     year: "numeric",

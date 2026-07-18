@@ -1,7 +1,8 @@
 /**
  * Tipos do motor de distribuição financeira.
- * O motor é puro: não depende de Prisma, Next.js ou React.
- * Os enums abaixo espelham o schema Prisma, mas são declarados de forma
+ * O motor é puro: não depende de Next.js, React ou de nenhum backend.
+ * Os enums abaixo espelham os tipos usados nos formulários do wizard, mas são
+ * declarados de forma
  * independente para manter `lib/engine` desacoplado do ORM.
  */
 

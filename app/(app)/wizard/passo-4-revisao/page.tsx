@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -8,50 +8,27 @@ import { Button } from "@/components/ui/Button";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { CurrencyInput } from "@/components/ui/CurrencyInput";
 import { Field, TextInput } from "@/components/ui/Field";
-import { PriorityBadge } from "@/components/ui/PriorityBadge";
+import { SummaryCardsRow } from "@/components/dashboard/SummaryCardsRow";
+import { CategoryDonutChart } from "@/components/dashboard/CategoryDonutChart";
+import { CashFlowLineChart } from "@/components/dashboard/CashFlowLineChart";
+import { EmergencyFundGauge } from "@/components/dashboard/EmergencyFundGauge";
+import { InsightList } from "@/components/dashboard/InsightList";
+import { TimelineList } from "@/components/dashboard/TimelineList";
 import { runEngine, type DistributionResult, type ExpenseInput, type IncomeInput } from "@/lib/engine";
 import { emergencyFundStepSchema, type EmergencyFundStepData } from "@/lib/validators/wizard";
 import { useWizard } from "@/lib/wizard/WizardContext";
-import { submitPlan } from "@/lib/actions/plan";
+import type { WizardData } from "@/lib/validators/wizard";
 
 function formatBRL(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-function statusLabel(status: string): string {
-  switch (status) {
-    case "PAGO":
-      return "Pago";
-    case "RECEBIDO":
-      return "Recebido";
-    case "ADIADA":
-      return "Adiada";
-    case "DEFICIT":
-      return "Em déficit";
-    default:
-      return status;
-  }
-}
-
-function statusColor(status: string): string {
-  switch (status) {
-    case "PAGO":
-    case "RECEBIDO":
-      return "text-mint-soft";
-    case "DEFICIT":
-      return "text-danger";
-    default:
-      return "text-text-faint";
-  }
-}
-
 export default function ReviewStepPage() {
   const router = useRouter();
   const { state, setEmergencyFund } = useWizard();
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
-  const [generatedPlanId, setGeneratedPlanId] = useState<string | null>(null);
-  const [isSaving, startSaving] = useTransition();
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const [pdfReady, setPdfReady] = useState(false);
 
   useEffect(() => {
     if (!state.personal) router.replace("/wizard/passo-1-dados");
@@ -65,6 +42,8 @@ export default function ReviewStepPage() {
   });
   const liveEmergencyFund = watch();
 
+  // Tudo é calculado no navegador, na hora — não existe requisição, banco de
+  // dados ou login envolvido para chegar até aqui.
   const result: DistributionResult | null = useMemo(() => {
     if (!state.personal || state.incomes.length === 0 || state.expenses.length === 0) return null;
     const referenceMonth = new Date();
@@ -82,42 +61,50 @@ export default function ReviewStepPage() {
     setEmergencyFund(data);
   }
 
-  function handleConfirmPlan(data: EmergencyFundStepData) {
+  async function handleGeneratePdf(data: EmergencyFundStepData) {
     setEmergencyFund(data);
-    setSaveError(null);
+    setPdfError(null);
 
     if (!state.personal) return;
 
-    startSaving(async () => {
-      const response = await submitPlan({
-        personal: state.personal!,
+    setIsGenerating(true);
+    try {
+      const payload: WizardData = {
+        personal: state.personal,
         incomes: state.incomes,
         expenses: state.expenses,
         emergencyFund: data,
+      };
+
+      const response = await fetch("/api/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
 
-      if (response.error) {
-        setSaveError(response.error);
-        return;
+      if (!response.ok) {
+        throw new Error("Não foi possível gerar o PDF. Tente novamente.");
       }
 
-      if (response.planId) {
-        setSaved(true);
-        setGeneratedPlanId(response.planId);
-        // Baixa o PDF automaticamente — sem login, sem passo extra.
-        const link = document.createElement("a");
-        link.href = `/api/pdf?planId=${response.planId}`;
-        link.download = "";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }
-    });
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "finance-ai-plano.pdf";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setPdfReady(true);
+    } catch (err) {
+      setPdfError(err instanceof Error ? err.message : "Erro ao gerar o PDF.");
+    } finally {
+      setIsGenerating(false);
+    }
   }
 
   if (!result) return null;
-
-  const sortedTimeline = [...result.timeline].sort((a, b) => a.date.getTime() - b.date.getTime());
 
   return (
     <div className="space-y-6">
@@ -131,17 +118,31 @@ export default function ReviewStepPage() {
           {state.expenses.length === 1 ? "saída" : "saídas"}.
         </p>
 
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <SummaryStat label="Entradas" value={formatBRL(result.totalIncome)} />
-          <SummaryStat label="Saídas" value={formatBRL(result.totalExpense)} />
-          <SummaryStat
-            label="Sobra"
-            value={formatBRL(result.balance)}
-            accent={result.balance >= 0 ? "mint" : "danger"}
+        <div className="mt-6">
+          <SummaryCardsRow
+            totalIncome={result.totalIncome}
+            totalExpense={result.totalExpense}
+            balance={result.balance}
+            healthScore={result.healthScore}
           />
-          <SummaryStat label="Health Score" value={String(result.healthScore)} accent="gold" />
         </div>
       </GlassCard>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <GlassCard className="p-7">
+          <h2 className="mb-4 font-display text-lg font-medium tracking-tight">
+            Gastos por categoria
+          </h2>
+          <CategoryDonutChart timeline={result.timeline} />
+        </GlassCard>
+
+        <GlassCard className="p-7">
+          <h2 className="mb-4 font-display text-lg font-medium tracking-tight">
+            Saldo ao longo do mês
+          </h2>
+          <CashFlowLineChart timeline={result.timeline} />
+        </GlassCard>
+      </div>
 
       <GlassCard className="p-7">
         <h2 className="font-display text-lg font-medium tracking-tight">Reserva de emergência</h2>
@@ -178,67 +179,28 @@ export default function ReviewStepPage() {
           </div>
         </form>
 
-        <div className="mt-5 grid grid-cols-3 gap-3 border-t border-line pt-5">
-          <SummaryStat
-            label="Custo essencial/mês"
-            value={formatBRL(result.emergencyFundStatus.essentialMonthlyCost)}
-          />
-          <SummaryStat label="Meta" value={formatBRL(result.emergencyFundStatus.targetAmount)} />
-          <SummaryStat
-            label="Cobertura atual"
-            value={`${result.emergencyFundStatus.coverageDays} dias`}
-            accent={result.emergencyFundStatus.coverageDays < 30 ? "danger" : "mint"}
+        <div className="mt-5 border-t border-line pt-5">
+          <EmergencyFundGauge
+            progressPct={result.emergencyFundStatus.progressPct}
+            coverageDays={result.emergencyFundStatus.coverageDays}
+            targetAmount={result.emergencyFundStatus.targetAmount}
+            currentAmount={result.emergencyFundStatus.currentAmount}
           />
         </div>
       </GlassCard>
 
       {result.insights.length > 0 && (
         <GlassCard className="p-7">
-          <h2 className="font-display text-lg font-medium tracking-tight">Insights</h2>
-          <div className="mt-4 space-y-2.5">
-            {result.insights.map((insight, i) => (
-              <div
-                key={i}
-                className={`rounded-xl border px-4 py-3 text-sm leading-relaxed ${
-                  insight.severity === "CRITICO"
-                    ? "border-danger/30 bg-danger/[0.06] text-text"
-                    : insight.severity === "ATENCAO"
-                      ? "border-gold/25 bg-gold/[0.05] text-text"
-                      : "border-line bg-white/[0.015] text-text-dim"
-                }`}
-              >
-                {insight.message}
-              </div>
-            ))}
-          </div>
+          <h2 className="mb-4 font-display text-lg font-medium tracking-tight">Insights</h2>
+          <InsightList insights={result.insights} />
         </GlassCard>
       )}
 
       <GlassCard className="p-7">
-        <h2 className="font-display text-lg font-medium tracking-tight">Linha do tempo do mês</h2>
-        <div className="mt-4 space-y-1.5">
-          {sortedTimeline.map((event) => (
-            <div
-              key={event.id}
-              className="flex items-center justify-between rounded-lg border border-line bg-white/[0.01] px-4 py-2.5"
-            >
-              <div className="flex items-center gap-3">
-                <span className="w-9 font-mono text-[11px] text-text-faint">
-                  {String(event.date.getDate()).padStart(2, "0")}/
-                  {String(event.date.getMonth() + 1).padStart(2, "0")}
-                </span>
-                <span className="text-[13px] text-text">{event.name}</span>
-                {event.priority && <PriorityBadge priority={event.priority} />}
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="font-mono text-[13px] text-text-dim">{formatBRL(event.amount)}</span>
-                <span className={`font-mono text-[11px] ${statusColor(event.status)}`}>
-                  {statusLabel(event.status)}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
+        <h2 className="mb-4 font-display text-lg font-medium tracking-tight">
+          Linha do tempo do mês
+        </h2>
+        <TimelineList timeline={result.timeline} />
       </GlassCard>
 
       <div className="flex items-center justify-between gap-4">
@@ -246,57 +208,20 @@ export default function ReviewStepPage() {
           Voltar
         </Button>
         <div className="text-right">
-          {saveError && <p className="mb-2 text-[12px] text-danger">{saveError}</p>}
-          {saved && generatedPlanId ? (
-            <div className="text-right">
-              <p className="mb-2 text-[12px] text-mint-soft">
-                Plano gerado. O download do PDF começou automaticamente.
-              </p>
-              <div className="flex items-center gap-3">
-                <Button href={`/dashboard/${generatedPlanId}`} variant="secondary">
-                  Ver dashboard
-                </Button>
-                <a
-                  href={`/api/pdf?planId=${generatedPlanId}`}
-                  download
-                  className="inline-flex items-center justify-center rounded-full bg-mint px-6 py-3 text-sm font-medium text-ink transition-all hover:bg-mint-soft"
-                >
-                  Baixar PDF de novo
-                </a>
-              </div>
-            </div>
-          ) : (
-            <Button onClick={handleSubmit(handleConfirmPlan)} disabled={isSaving}>
-              {isSaving ? "Gerando seu plano…" : "Gerar meu plano em PDF"}
-            </Button>
+          {pdfError && <p className="mb-2 text-[12px] text-danger">{pdfError}</p>}
+          {pdfReady && (
+            <p className="mb-2 text-[12px] text-mint-soft">
+              PDF baixado. Pode gerar de novo quantas vezes quiser.
+            </p>
           )}
+          <Button onClick={handleSubmit(handleGeneratePdf)} disabled={isGenerating}>
+            {isGenerating ? "Gerando PDF…" : pdfReady ? "Baixar PDF de novo" : "Gerar meu plano em PDF"}
+          </Button>
+          <p className="mt-2 text-[11px] text-text-faint">
+            {formatBRL(result.balance)} livres neste mês
+          </p>
         </div>
       </div>
-    </div>
-  );
-}
-
-function SummaryStat({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: string;
-  accent?: "mint" | "danger" | "gold";
-}) {
-  const accentClass =
-    accent === "mint"
-      ? "text-mint-soft"
-      : accent === "danger"
-        ? "text-danger"
-        : accent === "gold"
-          ? "text-gold"
-          : "text-text";
-  return (
-    <div className="rounded-xl border border-line bg-white/[0.02] p-3">
-      <p className="text-[11px] text-text-faint">{label}</p>
-      <p className={`mt-1 font-mono text-[15px] font-tabular ${accentClass}`}>{value}</p>
     </div>
   );
 }
